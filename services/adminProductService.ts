@@ -44,7 +44,7 @@ export const listProducts = async (params: ListProductsInput) => {
   const where: Prisma.ProductWhereInput = {};
 
   if (q) {
-    where.name = { contains: q, mode: 'insensitive' };
+    where.name = { contains: q };
   }
 
   if (categoryId) {
@@ -274,7 +274,9 @@ export const addProductImageFromFile = async (
     });
   }
 
-  const upload = await uploadService.createUpload(userId, file);
+  const upload = await uploadService.createUpload(userId, file, {
+    folder: 'products',
+  });
 
   const image = await prisma.productImage.create({
     data: {

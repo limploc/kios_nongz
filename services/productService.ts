@@ -28,7 +28,7 @@ export const listProducts = async (params: ListProductsParams) => {
   const where: Prisma.ProductWhereInput = {};
 
   if (q) {
-    where.name = { contains: q, mode: 'insensitive' };
+    where.name = { contains: q };
   }
 
   if (categoryId) {

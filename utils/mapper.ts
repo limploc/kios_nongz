@@ -28,6 +28,24 @@ type CartItemRecord = {
 
 type OrderWithItems = Order & { items: OrderItem[] };
 
+const resolveImageUrl = (url: string | null | undefined) => {
+  if (!url) {
+    return null;
+  }
+
+  if (/^https?:\/\//i.test(url)) {
+    return url;
+  }
+
+  const publicBackendUrl = process.env.PUBLIC_BACKEND_URL?.replace(/\/$/, '');
+
+  if (!publicBackendUrl) {
+    return url;
+  }
+
+  return url.startsWith('/') ? `${publicBackendUrl}${url}` : `${publicBackendUrl}/${url}`;
+};
+
 export const mapCategory = (category: Category) => ({
   id: String(category.id),
   name: category.name,
@@ -39,7 +57,7 @@ export const mapProduct = (product: ProductWithImages) => ({
   name: product.name,
   price: product.price,
   stock: product.stock,
-  image: product.images[0]?.url ?? null,
+  image: resolveImageUrl(product.images[0]?.url),
 });
 
 export const mapProductDetail = (product: ProductWithImagesAndCategory) => ({
@@ -48,7 +66,9 @@ export const mapProductDetail = (product: ProductWithImagesAndCategory) => ({
   description: product.description ?? null,
   price: product.price,
   stock: product.stock,
-  images: product.images.map((image) => image.url),
+  images: product.images.map((image) => resolveImageUrl(image.url)).filter(
+    (imageUrl): imageUrl is string => imageUrl !== null
+  ),
   category: mapCategory(product.category),
 });
 

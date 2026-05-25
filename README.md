@@ -9,6 +9,7 @@ A production-ready REST API for user management built with Node.js, Express.js, 
 - **Database**: MySQL
 - **Password Hashing**: bcrypt
 - **Environment Management**: dotenv
+- **File Storage**: Supabase Storage
 
 ## Project Structure
 
@@ -216,7 +217,14 @@ kios_backend/
      DB_PORT=3306
      PORT=3000
      NODE_ENV=development
+     PUBLIC_BACKEND_URL=http://localhost:3000
+     SUPABASE_URL=https://your-project.supabase.co
+     SUPABASE_SERVICE_KEY=your-supabase-service-role-key
+     SUPABASE_BUCKET=product-images
      ```
+
+   - Pastikan bucket Supabase yang dipakai bersifat public jika URL gambar ingin langsung dipakai dari database.
+   - `PUBLIC_BACKEND_URL` dipakai untuk data lama yang masih menyimpan path relatif seperti `/uploads/...`.
 
 5. **Start the server**
    

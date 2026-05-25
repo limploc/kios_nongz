@@ -13,7 +13,9 @@ class UploadController {
         throw createError('File is required', 400);
       }
 
-      const result = await uploadService.createUpload(authReq.user.id, req.file);
+      const result = await uploadService.createUpload(authReq.user.id, req.file, {
+        folder: 'uploads',
+      });
       res.status(200).json(result);
     } catch (error) {
       next(error as ServiceError);

@@ -31,7 +31,9 @@ export const uploadProof = async (
     throw createError('Payment cannot be updated', 400);
   }
 
-  const upload = await uploadService.createUpload(userId, file);
+  const upload = await uploadService.createUpload(userId, file, {
+    folder: 'payments',
+  });
 
   const payment = await prisma.payment.update({
     where: { id: order.payment.id },
