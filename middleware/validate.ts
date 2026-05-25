@@ -16,9 +16,15 @@ const validate = (schema: ZodSchema) => (req: Request, res: Response, next: Next
     });
   }
 
-  req.body = result.data.body ?? req.body;
-  req.params = result.data.params ?? req.params;
-  req.query = result.data.query ?? req.query;
+  const parsed = result.data as {
+    body?: typeof req.body;
+    params?: typeof req.params;
+    query?: typeof req.query;
+  };
+
+  req.body = parsed.body ?? req.body;
+  req.params = parsed.params ?? req.params;
+  req.query = parsed.query ?? req.query;
 
   next();
 };

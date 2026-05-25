@@ -1,3 +1,4 @@
+import { Prisma } from '@prisma/client';
 import prisma from '../config/prisma.js';
 import { createError } from '../utils/errors.js';
 import { getPagination } from '../utils/pagination.js';
@@ -23,97 +24,109 @@ const getShippingFee = () => {
 export const checkout = async (userId: number, input: CheckoutInput) => {
   const { addressId, paymentMethod, notes } = input;
 
-  const order = await prisma.$transaction(async (tx) => {
-    const address = await tx.address.findFirst({
-      where: { id: addressId, userId },
-    });
+  const order = await prisma.$transaction(
+    async (tx) => {
+      const address = await tx.address.findFirst({
+        where: { id: addressId, userId },
+      });
 
-    if (!address) {
-      throw createError('Address not found', 404);
-    }
+      if (!address) {
+        throw createError('Address not found', 404);
+      }
 
-    const cart = await tx.cart.findUnique({
-      where: { userId },
-      include: {
-        items: {
-          include: {
-            product: {
-              include: {
-                images: {
-                  orderBy: { isPrimary: 'desc' },
-                  take: 1,
+      const cart = await tx.cart.findUnique({
+        where: { userId },
+        include: {
+          items: {
+            include: {
+              product: {
+                include: {
+                  images: {
+                    orderBy: { isPrimary: 'desc' },
+                    take: 1,
+                  },
                 },
               },
             },
           },
         },
-      },
-    });
-
-    if (!cart || cart.items.length === 0) {
-      throw createError('Cart is empty', 400);
-    }
-
-    for (const item of cart.items) {
-      if (item.qty > item.product.stock) {
-        throw createError('Insufficient stock', 400);
-      }
-    }
-
-    const subtotal = cart.items.reduce(
-      (sum, item) => sum + item.price * item.qty,
-      0
-    );
-    const shipping = getShippingFee();
-    const total = subtotal + shipping;
-
-    const createdOrder = await tx.order.create({
-      data: {
-        userId,
-        addressId,
-        status: 'PENDING',
-        subtotal,
-        shipping,
-        total,
-        paymentMethod,
-        paymentStatus: 'PENDING',
-        paymentAmount: total,
-        notes: notes ?? null,
-      },
-    });
-
-    await tx.payment.create({
-      data: {
-        orderId: createdOrder.id,
-        method: paymentMethod,
-        status: 'PENDING',
-      },
-    });
-
-    await tx.orderItem.createMany({
-      data: cart.items.map((item) => ({
-        orderId: createdOrder.id,
-        productId: item.productId,
-        name: item.product.name,
-        qty: item.qty,
-        price: item.price,
-        image: item.product.images[0]?.url ?? null,
-      })),
-    });
-
-    for (const item of cart.items) {
-      await tx.product.update({
-        where: { id: item.productId },
-        data: { stock: { decrement: item.qty } },
       });
+
+      if (!cart || cart.items.length === 0) {
+        throw createError('Cart is empty', 400);
+      }
+
+      const subtotal = cart.items.reduce(
+        (sum, item) => sum + item.price * item.qty,
+        0
+      );
+      const shipping = getShippingFee();
+      const total = subtotal + shipping;
+
+      const createdOrder = await tx.order.create({
+        data: {
+          userId,
+          addressId,
+          status: 'PENDING',
+          subtotal,
+          shipping,
+          total,
+          paymentMethod,
+          paymentStatus: 'PENDING',
+          paymentAmount: total,
+          notes: notes ?? null,
+        },
+      });
+
+      await tx.payment.create({
+        data: {
+          orderId: createdOrder.id,
+          method: paymentMethod,
+          status: 'PENDING',
+        },
+      });
+
+      await tx.orderItem.createMany({
+        data: cart.items.map((item) => ({
+          orderId: createdOrder.id,
+          productId: item.productId,
+          name: item.product.name,
+          qty: item.qty,
+          price: item.price,
+          image: item.product.images[0]?.url ?? null,
+        })),
+      });
+
+      for (const item of cart.items) {
+        const stockUpdated = await tx.product.updateMany({
+          where: {
+            id: item.productId,
+            stock: {
+              gte: item.qty,
+            },
+          },
+          data: {
+            stock: { decrement: item.qty },
+          },
+        });
+
+        if (stockUpdated.count !== 1) {
+          throw createError('Insufficient stock', 400);
+        }
+      }
+
+      await tx.cartItem.deleteMany({
+        where: { cartId: cart.id },
+      });
+
+      return createdOrder;
+    },
+    {
+      isolationLevel: Prisma.TransactionIsolationLevel.Serializable,
+      timeout: 10000,
+      maxWait: 5000,
     }
-
-    await tx.cartItem.deleteMany({
-      where: { cartId: cart.id },
-    });
-
-    return createdOrder;
-  });
+  );
 
   return {
     orderId: String(order.id),
